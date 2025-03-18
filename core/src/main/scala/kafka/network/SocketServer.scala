@@ -708,13 +708,30 @@ private[kafka] abstract class Acceptor(val socketServer: SocketServer,
     }
   }
 
-  private def closeAll(): Unit = {
-    debug("Closing server socket, selector, and any throttled sockets.")
-    CoreUtils.swallow(serverChannel.close(), this, Level.ERROR)
-    CoreUtils.swallow(nioSelector.close(), this, Level.ERROR)
-    throttledSockets.foreach(throttledSocket => closeSocket(throttledSocket.socket, this))
-    throttledSockets.clear()
+private def closeAll(): Unit = {
+  debug("Closing server socket, selector, and any throttled sockets.")
+  
+/**
+ * Using Option(serverChannel) to ensure that 
+ * serverChannel is not null before executing the close operation
+ */
+  Option(serverChannel).foreach { ch =>
+    CoreUtils.swallow(ch.close(), this, Level.ERROR)
   }
+/**
+ * Use Option(nioSelector) to ensure that
+ * nioSelector is not null before closing it
+ */
+  Option(nioSelector).foreach { sel =>
+    CoreUtils.swallow(sel.close(), this, Level.ERROR)
+  }
+  // Close all restricted sockets.
+  Option(throttledSockets).foreach { sockets =>
+    sockets.foreach(throttledSocket => closeSocket(throttledSocket.socket, this))
+    sockets.clear()
+  }
+}
+
 
   /**
    * Create a server socket to listen for connections on.
